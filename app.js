@@ -12,6 +12,8 @@ swaggerDocument = require('./swagger.json');
 const rateLimit = require('express-rate-limit')
 const promMid = require('express-prometheus-middleware')
 
+const db = require('./queries');
+
 var app = express();
 
 // view engine setup
@@ -80,6 +82,12 @@ app.use(
 
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
+
+app.get('/users', db.getUsers);
+app.get('/users/:id', db.getUserById);
+app.post('/users', db.createUser);
+app.put('/users/:id', db.updateUser);
+app.delete('/users/:id', db.deleteUser);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
