@@ -10,9 +10,10 @@ var usersRouter = require('./routes/users');
 const swaggerUi = require('swagger-ui-express'),
 swaggerDocument = require('./swagger.json');
 const rateLimit = require('express-rate-limit')
-const promMid = require('express-prometheus-middleware')
+const metric = require('./metric/metric')
+// const promMid = require('express-prometheus-middleware')
 
-const db = require('./queries');
+const db = require('./query');
 
 var app = express();
 
@@ -22,7 +23,6 @@ app.set('view engine', 'jade');
 
 
 //rate-limit
-
 const limiter = rateLimit({
 	windowMs: 15 * 60 * 1000, // 15 minutes
 	max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
@@ -34,60 +34,38 @@ app.use(limiter)
 
 
 // metric
-app.use(promMid({
-  metricsPath: '/metrics',
-  collectDefaultMetrics: true,
-  requestDurationBuckets: [0.1, 0.5, 1, 1.5],
-  requestLengthBuckets: [512, 1024, 5120, 10240, 51200, 102400],
-  responseLengthBuckets: [512, 1024, 5120, 10240, 51200, 102400],
-  /**
-   * Uncomenting the `authenticate` callback will make the `metricsPath` route
-   * require authentication. This authentication callback can make a simple
-   * basic auth test, or even query a remote server to validate access.
-   * To access /metrics you could do:
-   * curl -X GET user:password@localhost:9091/metrics
-   */
-  // authenticate: req => req.headers.authorization === 'Basic dXNlcjpwYXNzd29yZA==',
-  /**
-   * Uncommenting the `extraMasks` config will use the list of regexes to
-   * reformat URL path names and replace the values found with a placeholder value
-  */
-  // extraMasks: [/..:..:..:..:..:../],
-  /**
-   * The prefix option will cause all metrics to have the given prefix.
-   * E.g.: `app_prefix_http_requests_total`
-   */
-  // prefix: 'app_prefix_',
-  /**
-   * Can add custom labels with customLabels and transformLabels options
-   */
-  // customLabels: ['contentType'],
-  // transformLabels(labels, req) {
-  //   // eslint-disable-next-line no-param-reassign
-  //   labels.contentType = req.headers['content-type'];
-  // },
-}));
+app.use(metric);
 
+
+// morgan
 app.use(logger('dev'));
+
+// convert json
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// cookies
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// swagger
 app.use(
   '/api-docs',
   swaggerUi.serve, 
   swaggerUi.setup(swaggerDocument)
 );
 
-app.use('/', indexRouter);
-app.use('/users', usersRouter);
 
+// make route
+app.use('/', indexRouter);
+
+//crud
 app.get('/users', db.getUsers);
 app.get('/users/:id', db.getUserById);
 app.post('/users', db.createUser);
 app.put('/users/:id', db.updateUser);
 app.delete('/users/:id', db.deleteUser);
+
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
